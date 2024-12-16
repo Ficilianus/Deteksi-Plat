@@ -18,16 +18,39 @@ def proses_gambar():
     if not img_path:
         print("Belum ada gambar yang diinput!")
         return
-    
-    # Memanggil fungsi pemrosesan di file process_image.py
-    hasil_path = process_image.deteksi_plat(img_path)  # Fungsi ini akan memproses gambar dan mengembalikan path hasil
-    
-    # Menampilkan hasil pada area gambar 2
-    img = Image.open(hasil_path)
-    img = img.resize((int(image_width), int(image_height)))  # Resize untuk ditampilkan di area gambar 2
-    img_tk = ImageTk.PhotoImage(img)
-    label2.config(image=img_tk)
-    label2.image = img_tk
+
+    # ===== Proses Thresholding =====
+    import cv2
+    import os
+
+    # Membuka gambar asli dan mengubahnya menjadi grayscale
+    img_asli = cv2.imread(img_path, cv2.IMREAD_COLOR)
+    gray = cv2.cvtColor(img_asli, cv2.COLOR_BGR2GRAY)
+
+    # Thresholding (Otsu's Thresholding)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Simpan hasil thresholding ke file sementara
+    thresh_path = os.path.join(os.path.dirname(img_path), "hasil_thresholding.jpg")
+    cv2.imwrite(thresh_path, thresh)
+
+    # ===== Tampilkan hasil thresholding di area Gambar 2 =====
+    img_thresh = Image.open(thresh_path)
+    img_thresh = img_thresh.resize((int(image_width), int(image_height)))
+    img_thresh_tk = ImageTk.PhotoImage(img_thresh)
+    label2.config(image=img_thresh_tk, text="")  # Menampilkan hasil thresholding
+    label2.image = img_thresh_tk
+
+    # ===== Panggil fungsi deteksi plat nomor =====
+    hasil_path = process_image.deteksi_plat(img_path)  # Deteksi plat nomor
+
+    # Tampilkan hasil deteksi plat nomor di area Gambar 3
+    img_result = Image.open(hasil_path)
+    img_result = img_result.resize((int(image_width), int(image_height)))
+    img_result_tk = ImageTk.PhotoImage(img_result)
+    label3.config(image=img_result_tk, text="")  # Menampilkan hasil deteksi plat nomor
+    label3.image = img_result_tk
+
 
 def keluar():
     root.destroy()

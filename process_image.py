@@ -7,6 +7,7 @@ import os
 # Pastikan Pytesseract sudah diinstal di sistem Anda
 # Jika menggunakan Windows, pastikan path Tesseract sudah benar.
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
 def deteksi_plat(image_path):
     """
     Fungsi untuk mendeteksi plat nomor pada gambar menggunakan OpenCV dan Pytesseract.
@@ -22,8 +23,11 @@ def deteksi_plat(image_path):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, 13, 15, 15)  # Menghilangkan noise sambil mempertahankan tepi
 
+    # Thresholding untuk meningkatkan kontras
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)  # Otsu's thresholding
+
     # Deteksi tepi
-    edged = cv2.Canny(gray, 30, 200)
+    edged = cv2.Canny(thresh, 30, 200)
 
     # Temukan kontur
     contours = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
