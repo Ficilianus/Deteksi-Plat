@@ -16,7 +16,7 @@ def input_gambar():
         img_tk = ImageTk.PhotoImage(img)
         label1.config(image=img_tk, text="")
         label1.image = img_tk
-# Fungsi untuk memproses gambar
+# Fungsi untuk memproses gambar 
 def proses_gambar():
     global img_path
     if not img_path:
@@ -31,7 +31,7 @@ def proses_gambar():
     else:
         # Tampilkan hasil gambar di setiap tahap
         tampilkan_gambar(img_path, label1)  # Gambar asli
-        
+           
         # Grayscale
         cv2.imwrite("temp_grayscale.jpg", results['grayscale'])
         tampilkan_gambar("temp_grayscale.jpg", label2)
@@ -47,6 +47,10 @@ def proses_gambar():
         # Edge Detection
         cv2.imwrite("temp_edges.jpg", results['edges'])
         tampilkan_gambar("temp_edges.jpg", label5)
+
+        # Gambar kendaraan dengan border plat nomor
+        cv2.imwrite("temp_with_border.jpg", results['detected_plate_with_border'])
+        tampilkan_gambar("temp_with_border.jpg", label6)
 
         # Crop Plat Nomor
         if results['cropped_plate'] is not None:
@@ -76,7 +80,7 @@ root.geometry(f"{screen_width}x{screen_height}")
 # Dimensi area gambar
 left_width = screen_width * 0.2
 right_width = screen_width * 0.8
-image_width = right_width / 4
+image_width = right_width / 3
 image_height = screen_height / 2
 img_path = None
 

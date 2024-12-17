@@ -9,6 +9,7 @@ def process_image(input_path):
     3. Adaptive Thresholding
     4. Edge Detection (Canny)
     5. Crop Plat Nomor (Menggunakan Contour Terbesar)
+    6. Gambar Border di Sekitar Plat Nomor
 
     Args:
         input_path (str): Path gambar input.
@@ -58,10 +59,16 @@ def process_image(input_path):
 
         # Validasi ukuran contour agar masuk akal
         if w > 50 and h > 20:  # Ukuran minimal plat nomor
+            # Gambar Border di Sekitar Plat Nomor
+            img_with_border = img.copy()
+            cv2.rectangle(img_with_border, (x, y), (x + w, y + h), (0, 255, 0), 3)  # Border hijau
+            results['detected_plate_with_border'] = img_with_border
+            # Crop plat nomor
             crop_img = img[y:y+h, x:x+w]
             results['cropped_plate'] = crop_img
             return results, True  # Berhasil menemukan plat nomor
     # Jika tidak ada kontur atau ukuran tidak valid
     print("Plat nomor tidak terdeteksi.")
+    results['detected_plate_with_border'] = img  # Gambar tanpa border
     results['cropped_plate'] = None
     return results, False
