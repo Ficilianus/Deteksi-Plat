@@ -1,80 +1,67 @@
 import cv2
-import imutils
-import numpy as np
-import pytesseract
 import os
 
-# Pastikan Pytesseract sudah diinstal di sistem Anda
-# Jika menggunakan Windows, pastikan path Tesseract sudah benar.
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+def process_image(input_path):
+    """
+    Fungsi untuk memproses gambar input dengan tahapan:
+    1. Grayscale
+    2. Gaussian Blur (Noise Removal)
+    3. Adaptive Thresholding
+    4. Edge Detection (Canny)
+    5. Crop Plat Nomor (Menggunakan Contour Terbesar)
 
-def deteksi_plat(image_path):
+    Args:
+        input_path (str): Path gambar input.
+
+    Returns:
+        dict: Dictionary berisi semua hasil tahapan pemrosesan gambar.
+        bool: Status apakah plat nomor ditemukan atau tidak.
     """
-    Fungsi untuk mendeteksi plat nomor pada gambar menggunakan OpenCV dan Pytesseract.
-    """
-    # Membaca gambar
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    results = {}  # Menyimpan hasil gambar di setiap tahapan
+
+    # Pastikan gambar ada
+    if not os.path.exists(input_path):
+        print("File gambar tidak ditemukan!")
+        return None, False
+
+    # 1. Baca Gambar
+    img = cv2.imread(input_path)
     if img is None:
-        raise ValueError("Gambar tidak ditemukan!")
+        print("Gagal membaca gambar!")
+        return None, False
+    results['original'] = img  # Simpan gambar asli
 
-    img = cv2.resize(img, (600, 400))  # Resize gambar untuk mempermudah deteksi
-
-    # Konversi ke grayscale
+    # 2. Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.bilateralFilter(gray, 13, 15, 15)  # Menghilangkan noise sambil mempertahankan tepi
+    results['grayscale'] = gray
 
-    # Thresholding untuk meningkatkan kontras
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)  # Otsu's thresholding
+    # 3. Noise Removal - Gaussian Blur
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    results['gaussian_blur'] = blur
 
-    # Deteksi tepi
-    edged = cv2.Canny(thresh, 30, 200)
+    # 4. Adaptive Thresholding
+    thresh = cv2.adaptiveThreshold(
+        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    results['threshold'] = thresh
 
-    # Temukan kontur
-    contours = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contours = imutils.grab_contours(contours)
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]  # Urutkan berdasarkan ukuran
+    # 5. Edge Detection - Canny
+    edges = cv2.Canny(thresh, 50, 150)
+    results['edges'] = edges
 
-    screenCnt = None
+    # 6. Contour Detection & Crop (Plat Nomor)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        # Ambil contour terbesar
+        contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(contour)
 
-    # Cari kontur yang memiliki bentuk persegi panjang
-    for c in contours:
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.018 * peri, True)
-
-        if len(approx) == 4:  # Jika ditemukan 4 sisi (persegi panjang)
-            screenCnt = approx
-            break
-
-    if screenCnt is None:
-        print("Tidak ada plat nomor yang terdeteksi.")
-        return None
-
-    # Gambar kontur pada gambar asli dengan warna hijau
-    cv2.drawContours(img, [screenCnt], -1, (0, 255, 0), 3)
-
-    # Buat masker untuk mengekstraksi area plat
-    mask = np.zeros(gray.shape, np.uint8)
-    new_image = cv2.drawContours(mask, [screenCnt], 0, 255, -1)
-    new_image = cv2.bitwise_and(img, img, mask=mask)
-
-    # Crop area plat
-    (x, y) = np.where(mask == 255)
-    (topx, topy) = (np.min(x), np.min(y))
-    (bottomx, bottomy) = (np.max(x), np.max(y))
-    cropped = gray[topx:bottomx+1, topy:bottomy+1]
-
-    # Simpan hasil gambar dan area cropped
-    hasil_path = os.path.join(os.path.dirname(image_path), "hasil_deteksi.jpg")
-    crop_path = os.path.join(os.path.dirname(image_path), "crop_plate.jpg")
-
-    cv2.imwrite(hasil_path, img)  # Menyimpan gambar dengan kotak deteksi
-    cv2.imwrite(crop_path, cropped)  # Menyimpan gambar crop
-
-    # Gunakan pytesseract untuk membaca teks (opsional)
-    try:
-        text = pytesseract.image_to_string(cropped, config='--psm 11')
-        print("Plat nomor terdeteksi:", text.strip())
-    except Exception as e:
-        print("Gagal membaca teks dari plat:", e)
-
-    return hasil_path
+        # Validasi ukuran contour agar masuk akal
+        if w > 50 and h > 20:  # Ukuran minimal plat nomor
+            crop_img = img[y:y+h, x:x+w]
+            results['cropped_plate'] = crop_img
+            return results, True  # Berhasil menemukan plat nomor
+    # Jika tidak ada kontur atau ukuran tidak valid
+    print("Plat nomor tidak terdeteksi.")
+    results['cropped_plate'] = None
+    return results, False

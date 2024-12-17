@@ -2,70 +2,56 @@ import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
 import cv2
-import pytesseract
 import os
-import process_image  # Fungsi deteksi plat
+import process_image
+from tkinter import messagebox
+import process_image
 
 # Fungsi Input Gambar
 def input_gambar():
     global img_path
-    img_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp;*.gif")])
+    img_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")])
     if img_path:
         img = Image.open(img_path).resize((int(image_width), int(image_height)))
         img_tk = ImageTk.PhotoImage(img)
         label1.config(image=img_tk, text="")
         label1.image = img_tk
-
-# Fungsi Proses Gambar
+# Fungsi untuk memproses gambar
 def proses_gambar():
     global img_path
     if not img_path:
-        print("Belum ada gambar yang diinput!")
+        messagebox.showerror("Error", "Silakan input gambar terlebih dahulu!")
         return
-    
-    # Membaca gambar
-    img = cv2.imread(img_path)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
-    # ===== Preprocessing 1: CLAHE (Peningkatan Kontras) =====
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    clahe_path = os.path.join(os.path.dirname(img_path), "clahe.jpg")
-    cv2.imwrite(clahe_path, enhanced)
-    tampilkan_gambar(clahe_path, label2)
-    
-    # ===== Preprocessing 2: Gaussian Blur =====
-    gaussian_blur = cv2.GaussianBlur(enhanced, (3, 3), 0)
-    blur_path = os.path.join(os.path.dirname(img_path), "gaussian_blur.jpg")
-    cv2.imwrite(blur_path, gaussian_blur)
-    tampilkan_gambar(blur_path, label3)
-    
-    # ===== Preprocessing 3: Adaptive Thresholding =====
-    adaptive_thresh = cv2.adaptiveThreshold(gaussian_blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                            cv2.THRESH_BINARY, 11, 2)
-    thresh_path = os.path.join(os.path.dirname(img_path), "adaptive_thresh.jpg")
-    cv2.imwrite(thresh_path, adaptive_thresh)
-    tampilkan_gambar(thresh_path, label4)
 
-    # ===== Preprocessing 4: Edge Detection (Canny) =====
-    edges = cv2.Canny(adaptive_thresh, 50, 150)
-    edges_path = os.path.join(os.path.dirname(img_path), "edges.jpg")
-    cv2.imwrite(edges_path, edges)
-    tampilkan_gambar(edges_path, label5)
-    
-    # ===== Proses Morfologi Closing =====
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-    closing = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-    closing_path = os.path.join(os.path.dirname(img_path), "closing.jpg")
-    cv2.imwrite(closing_path, closing)
-    tampilkan_gambar(closing_path, label6)
+    # Panggil fungsi pemrosesan gambar
+    results, status = process_image.process_image(img_path)
 
-    # ===== Deteksi Plat Nomor =====
-    hasil_path = process_image.deteksi_plat(img_path)  # Deteksi plat dari file process_image.py
-    if hasil_path:
-        tampilkan_gambar(hasil_path, label6)
+    if not status:  # Jika plat nomor tidak ditemukan
+        messagebox.showwarning("Peringatan", "Plat nomor tidak dapat ditemukan pada gambar.")
     else:
-        print("Plat nomor tidak terdeteksi!")
+        # Tampilkan hasil gambar di setiap tahap
+        tampilkan_gambar(img_path, label1)  # Gambar asli
+        
+        # Grayscale
+        cv2.imwrite("temp_grayscale.jpg", results['grayscale'])
+        tampilkan_gambar("temp_grayscale.jpg", label2)
+
+        # Gaussian Blur
+        cv2.imwrite("temp_blur.jpg", results['gaussian_blur'])
+        tampilkan_gambar("temp_blur.jpg", label3)
+
+        # Adaptive Thresholding
+        cv2.imwrite("temp_thresh.jpg", results['threshold'])
+        tampilkan_gambar("temp_thresh.jpg", label4)
+
+        # Edge Detection
+        cv2.imwrite("temp_edges.jpg", results['edges'])
+        tampilkan_gambar("temp_edges.jpg", label5)
+
+        # Crop Plat Nomor
+        if results['cropped_plate'] is not None:
+            cv2.imwrite("temp_crop.jpg", results['cropped_plate'])
+            tampilkan_gambar("temp_crop.jpg", label7)
 
 # Fungsi Tampilkan Gambar
 def tampilkan_gambar(path, label):
@@ -81,14 +67,16 @@ def keluar():
 # ===== GUI Setup =====
 root = tk.Tk()
 root.title("Aplikasi Deteksi Plat Nomor")
-screen_width = 1024
+
+# Perbesar ukuran GUI
+screen_width = 1280
 screen_height = 768
 root.geometry(f"{screen_width}x{screen_height}")
 
 # Dimensi area gambar
-left_width = screen_width * 0.25
-right_width = screen_width * 0.75
-image_width = right_width / 3
+left_width = screen_width * 0.2
+right_width = screen_width * 0.8
+image_width = right_width / 4
 image_height = screen_height / 2
 img_path = None
 
@@ -107,24 +95,27 @@ btn_keluar.pack(pady=10)
 frame_right = tk.Frame(root, width=right_width, height=screen_height, bg="white")
 frame_right.pack(side="right", fill="both", expand=True)
 
-# Area 6 Gambar
+# Area 7 Gambar
 label1 = tk.Label(frame_right, bg="lightblue", text="Gambar Input", borderwidth=2, relief="solid")
 label1.place(x=0, y=0, width=image_width, height=image_height)
 
-label2 = tk.Label(frame_right, bg="lightgreen", text="CLAHE", borderwidth=2, relief="solid")
+label2 = tk.Label(frame_right, bg="lightgreen", text="Grayscale", borderwidth=2, relief="solid")
 label2.place(x=image_width, y=0, width=image_width, height=image_height)
 
 label3 = tk.Label(frame_right, bg="lightpink", text="Gaussian Blur", borderwidth=2, relief="solid")
 label3.place(x=image_width * 2, y=0, width=image_width, height=image_height)
 
-label4 = tk.Label(frame_right, bg="lightyellow", text="Adaptive Threshold", borderwidth=2, relief="solid")
-label4.place(x=0, y=image_height, width=image_width, height=image_height)
+label4 = tk.Label(frame_right, bg="lightyellow", text="Thresholding", borderwidth=2, relief="solid")
+label4.place(x=image_width * 3, y=0, width=image_width, height=image_height)
 
 label5 = tk.Label(frame_right, bg="lightcyan", text="Edge Detection", borderwidth=2, relief="solid")
-label5.place(x=image_width, y=image_height, width=image_width, height=image_height)
+label5.place(x=0, y=image_height, width=image_width, height=image_height)
 
 label6 = tk.Label(frame_right, bg="lightgray", text="Hasil Deteksi Plat", borderwidth=2, relief="solid")
-label6.place(x=image_width * 2, y=image_height, width=image_width, height=image_height)
+label6.place(x=image_width, y=image_height, width=image_width, height=image_height)
+
+label7 = tk.Label(frame_right, bg="lightcoral", text="Crop Plat Nomor", borderwidth=2, relief="solid")
+label7.place(x=image_width * 2, y=image_height, width=image_width, height=image_height)
 
 # Menjalankan aplikasi
 root.mainloop()
